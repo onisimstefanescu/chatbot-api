@@ -51,6 +51,9 @@ app.MapPost("/chat", async (
     return Results.Ok(new { answer });
 });
 
+var port = Environment.GetEnvironmentVariable("PORT") ?? "5000";
+app.Urls.Add($"http://0.0.0.0:{port}");
+
 app.Run();
 
 record ChatRequest(string SiteId, string Question);
