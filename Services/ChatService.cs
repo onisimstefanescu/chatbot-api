@@ -7,11 +7,14 @@ namespace Chatbot.Api.Services
     public class ChatService
     {
         private readonly IConfiguration _config;
+        private readonly IWebHostEnvironment _env;
         private readonly HttpClient _http;
 
-        public ChatService(IConfiguration config)
+        public ChatService(IConfiguration config, IWebHostEnvironment env)
         {
             _config = config;
+            _env = env;
+
             _http = new HttpClient();
             _http.DefaultRequestHeaders.Authorization =
                 new AuthenticationHeaderValue("Bearer", _config["OPENAI_API_KEY"]);
@@ -19,10 +22,19 @@ namespace Chatbot.Api.Services
 
         public async Task<string> Ask(string siteId, string question)
         {
-            var context = File.ReadAllText($"Sites/{siteId}.txt");
-            var systemPrompt = File.ReadAllText("Prompts/system-prompt.txt")
-                .Replace("{SITE_ID}", siteId)
-                .Replace("{CONTEXT}", context);
+            var basePath = _env.ContentRootPath; // 👈 AICI e cheia
+
+            var contextPath = Path.Combine(basePath, "Sites", $"{siteId}.txt");
+            var promptPath = Path.Combine(basePath, "Prompts", "system-prompt.txt");
+
+            if (!File.Exists(contextPath))
+                throw new Exception($"Context file not found: {contextPath}");
+
+            if (!File.Exists(promptPath))
+                throw new Exception($"Prompt file not found: {promptPath}");
+
+            var context = File.ReadAllText(contextPath);
+            var systemPrompt = File.ReadAllText(promptPath);
 
             var payload = new
             {
