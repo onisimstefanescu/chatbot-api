@@ -24,7 +24,13 @@
 
 //app.Run();
 
+using Chatbot.Api.Models;
+
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.Configure<ChatbotConfig>(
+    builder.Configuration.GetSection("Chatbot")
+);
 
 // ?? IMPORTANT
 builder.Configuration

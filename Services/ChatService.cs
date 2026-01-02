@@ -1,47 +1,42 @@
 ﻿using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text;
+using Chatbot.Api.Models;
+using Microsoft.Extensions.Options;
 
 namespace Chatbot.Api.Services
 {
     public class ChatService
     {
-        private readonly IConfiguration _config;
-        private readonly IWebHostEnvironment _env;
+        private readonly ChatbotConfig _config;
         private readonly HttpClient _http;
 
-        public ChatService(IConfiguration config, IWebHostEnvironment env)
+        public ChatService(
+            IOptions<ChatbotConfig> chatbotOptions,
+            IConfiguration configuration)
         {
-            _config = config;
-            _env = env;
+            _config = chatbotOptions.Value;
 
             _http = new HttpClient();
             _http.DefaultRequestHeaders.Authorization =
-                new AuthenticationHeaderValue("Bearer", _config["OPENAI_API_KEY"]);
+                new AuthenticationHeaderValue("Bearer", configuration["OPENAI_API_KEY"]);
         }
 
         public async Task<string> Ask(string siteId, string question)
         {
-            var basePath = _env.ContentRootPath; // 👈 AICI e cheia
+            if (!_config.Sites.TryGetValue(siteId, out var site))
+                throw new Exception($"SiteId necunoscut: {siteId}");
 
-            var contextPath = Path.Combine(basePath, "Sites", $"{siteId}.txt");
-            var promptPath = Path.Combine(basePath, "Prompts", "system-prompt.txt");
-
-            if (!File.Exists(contextPath))
-                throw new Exception($"Context file not found: {contextPath}");
-
-            if (!File.Exists(promptPath))
-                throw new Exception($"Prompt file not found: {promptPath}");
-
-            var context = File.ReadAllText(contextPath);
-            var systemPrompt = File.ReadAllText(promptPath);
+            var prompt = _config.PromptTemplate
+                .Replace("{SITE_ID}", siteId)
+                .Replace("{CONTEXT}", site.Context);
 
             var payload = new
             {
                 model = "gpt-4o-mini",
                 messages = new[]
                 {
-                new { role = "system", content = systemPrompt },
+                new { role = "system", content = prompt },
                 new { role = "user", content = question }
             }
             };
