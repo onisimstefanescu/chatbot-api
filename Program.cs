@@ -1,14 +1,15 @@
-using Chatbot.Api.Models;
+﻿using Chatbot.Api.Models;
 using Chatbot.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+const string ADMIN_PASSWORD = "PP123!";
 
-// ?? ORDINE CORECT�: mai �nt�i sursele de config
+// 🔑 ORDINE CORECTĂ: config sources
 builder.Configuration
     .AddUserSecrets<Program>()
     .AddEnvironmentVariables();
 
-// ?? apoi bind-uirea configului
+// 🔧 Bind Chatbot config
 builder.Services.Configure<ChatbotConfig>(
     builder.Configuration.GetSection("Chatbot")
 );
@@ -17,11 +18,13 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddCors();
 
-// ?? un singur ChatService, clar
+// 🧠 Services
 builder.Services.AddSingleton<ChatService>();
+builder.Services.AddSingleton<SupabaseService>();
 
 var app = builder.Build();
 
+// 🌐 Middleware
 app.UseCors(x =>
     x.AllowAnyOrigin()
      .AllowAnyMethod()
@@ -30,6 +33,11 @@ app.UseCors(x =>
 app.UseSwagger();
 app.UseSwaggerUI();
 
+// =======================
+// 🔵 API ENDPOINTS
+// =======================
+
+// 🔹 Chat endpoint
 app.MapPost("/chat", async (
     ChatRequest request,
     ChatService chatService) =>
@@ -38,10 +46,43 @@ app.MapPost("/chat", async (
     return Results.Ok(new { answer });
 });
 
-// ?? Railway PORT
+// 🔹 Lead endpoint (FORMULAR)
+app.MapPost("/lead", async (
+    LeadRequest request,
+    SupabaseService supabase) =>
+{
+    await supabase.CreateLead(
+        request.Name,
+        request.Email,
+        request.Site
+    );
+
+    return Results.Ok(new { success = true });
+});
+
+app.MapGet("/leads", async (
+    HttpContext context,
+    SupabaseService supabase) =>
+{
+    if (!context.Request.Headers.TryGetValue("X-Admin-Password", out var password) ||
+        password != ADMIN_PASSWORD)
+    {
+        return Results.Unauthorized();
+    }
+
+    var leads = await supabase.GetLeads();
+    return Results.Ok(leads);
+});
+
+
+// 🌐 Railway PORT
 var port = Environment.GetEnvironmentVariable("PORT") ?? "5000";
 app.Urls.Add($"http://0.0.0.0:{port}");
 
 app.Run();
 
+// =======================
+// 🔵 REQUEST MODELS
+// =======================
 record ChatRequest(string SiteId, string Question);
+record LeadRequest(string Name, string Email, string Site);
